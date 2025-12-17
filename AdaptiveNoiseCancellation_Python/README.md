@@ -1,5 +1,3 @@
-# **Active Noise Cancellation (ANC) – Python Implementation**
-
 ## **Project Overview**
 
 This project demonstrates a **real-time Active Noise Cancellation (ANC) system** implemented in Python using the **Normalized Least Mean Squares (NLMS) adaptive filter**.
