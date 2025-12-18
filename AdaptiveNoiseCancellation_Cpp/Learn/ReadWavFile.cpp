@@ -82,32 +82,32 @@ class readFile {
 
 };
 
-// int main() {
-//     ifstream wav("monotest.wav", ios::binary);
-//     if (!wav) {
-//         cerr << "Cannot open WAV file!\n";
-//         return 1;
-//     }
+int main() {
+    ifstream wav("monotest.wav", ios::binary);
+    if (!wav) {
+        cerr << "Cannot open WAV file!\n";
+        return 1;
+    }
 
-//     readFile rf(wav);
-//     rf.readInfo();
+    readFile rf(wav);
+    rf.readInfo();
 
-//     cout << "Sampling Freq: " << rf.get_sampling_freq()
-//          << "  Number of Channels: " << rf.get_channel_numbers()
-//          << "  Audio Format: " << rf.get_audio_format() << endl;
-
-    
-//     unsigned int number_of_samples = 44100*2;
-//     unsigned short int starting_sample = 0;
-    
-//     std::vector<int16_t> data = rf.readData(number_of_samples,starting_sample);
-//     cout<<"[";
-//     for(int i = 0;i<data.size();i++){
-//         cout<<data[i]<<",";
-//     }
-    
-//     cout<<"]";
+    cout << "Sampling Freq: " << rf.get_sampling_freq()
+         << "  Number of Channels: " << rf.get_channel_numbers()
+         << "  Audio Format: " << rf.get_audio_format() << endl;
 
     
-//     return 0;
-// }
+    unsigned int number_of_samples = 44100*2;
+    unsigned short int starting_sample = 0;
+    
+    std::vector<int16_t> data = rf.readData(number_of_samples,starting_sample);
+    cout<<"[";
+    for(int i = 0;i<data.size();i++){
+        cout<<data[i]<<",";
+    }
+    
+    cout<<"]";
+
+    
+    return 0;
+}
