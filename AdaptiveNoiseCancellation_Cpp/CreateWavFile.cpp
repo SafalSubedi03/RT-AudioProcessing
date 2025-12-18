@@ -38,55 +38,55 @@ const double duration = 2; //in s
 
 
 
-int main(){
+// int main(){
 
-    ofstream wav;
-    wav.open("test.wav",ios::binary);
+//     ofstream wav;
+//     wav.open("test.wav",ios::binary);
 
-    if(wav.is_open()){
-        wav<<chunk_id;
-        wav<<chunk_size;
-        wav<<format;
+//     if(wav.is_open()){
+//         wav<<chunk_id;
+//         wav<<chunk_size;
+//         wav<<format;
 
-        wav<<sub_chunk1_id;
-        write_as_byte(wav,sub_chunk1_size,4);
-        write_as_byte(wav,audio_format,2);
-        write_as_byte(wav,num_channels,2);
-        write_as_byte(wav,sample_rate,4);
-        write_as_byte(wav,byte_rate,4);
-        write_as_byte(wav,block_align,2);
-        write_as_byte(wav,bits_per_sample,2);
+//         wav<<sub_chunk1_id;
+//         write_as_byte(wav,sub_chunk1_size,4);
+//         write_as_byte(wav,audio_format,2);
+//         write_as_byte(wav,num_channels,2);
+//         write_as_byte(wav,sample_rate,4);
+//         write_as_byte(wav,byte_rate,4);
+//         write_as_byte(wav,block_align,2);
+//         write_as_byte(wav,bits_per_sample,2);
 
-        wav <<sub_chunk2_id;
-        wav<<sub_chunk2_size;
+//         wav <<sub_chunk2_id;
+//         wav<<sub_chunk2_size;
 
-        int start_audio = wav.tellp();
+//         int start_audio = wav.tellp();
 
-        for (int i =0;i<duration *sample_rate;i++){
-            double amplitude = double(i) / sample_rate * max_amplitude;
-            double value = sin((2*3.14*frequency*i)/sample_rate);
+//         for (int i =0;i<duration *sample_rate;i++){
+//             double amplitude = double(i) / sample_rate * max_amplitude;
+//             double value = sin((2*3.14*frequency*i)/sample_rate);
 
-            double channel1 = amplitude * value/2;
-            double channel2 = (max_amplitude-amplitude) * value;
-            // Write data values in each channel
-            write_as_byte(wav , channel1, 2);
-            write_as_byte(wav , channel2, 2);
-        }
+//             double channel1 = amplitude * value/2;
+//             double channel2 = (max_amplitude-amplitude) * value;
+//             // Write data values in each channel
+//             write_as_byte(wav , channel1, 2);
+//             //write_as_byte(wav , channel2, 2);
+//         }
 
-            int end_audio = wav.tellp();
-            //Store the size of the audio data in sub_chunk2_size
-            wav.seekp(start_audio-4);
-            write_as_byte(wav,end_audio-start_audio,4);
+//             int end_audio = wav.tellp();
+//             //Store the size of the audio data in sub_chunk2_size
+//             wav.seekp(start_audio-4);
+//             write_as_byte(wav,end_audio-start_audio,4);
 
-            // Store the chunkSize
-            wav.seekp(4,ios::beg);
-            //write_as_byte(wav,end_audio-start_audio+sub_chunk1_size+16+4,4);
-            write_as_byte(wav,end_audio-8,4);
+//             // Store the chunkSize
+//             wav.seekp(4,ios::beg);
+//             //write_as_byte(wav,end_audio-start_audio+sub_chunk1_size+16+4,4);
+//             write_as_byte(wav,end_audio-8,4);
 
         
-    }
+//     }
 
 
-    wav.close();
-    return 0;
-}
+//     wav.close();
+//     return 0;
+// }
