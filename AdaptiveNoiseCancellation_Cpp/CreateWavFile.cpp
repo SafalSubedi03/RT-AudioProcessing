@@ -32,9 +32,9 @@ void write_as_byte(ofstream &file,int value, int byte_size){
 }
 
 // Audio file parameters
-const int frequency = 90;
+const int frequency = 1000;
 const int max_amplitude = 32767;
-const int duration = 2; //in s
+const double duration = 2; //in s
 
 
 
@@ -63,10 +63,10 @@ int main(){
         int start_audio = wav.tellp();
 
         for (int i =0;i<duration *sample_rate;i++){
-            double amplitude = (i / duration * sample_rate) * max_amplitude;
+            double amplitude = double(i) / sample_rate * max_amplitude;
             double value = sin((2*3.14*frequency*i)/sample_rate);
 
-            double channel1 = amplitude * value;
+            double channel1 = amplitude * value/2;
             double channel2 = (max_amplitude-amplitude) * value;
             // Write data values in each channel
             write_as_byte(wav , channel1, 2);
