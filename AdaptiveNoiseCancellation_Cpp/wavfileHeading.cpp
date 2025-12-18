@@ -32,7 +32,7 @@ void write_as_byte(ofstream &file,int value, int byte_size){
 }
 
 // Audio file parameters
-const int frequency = 900;
+const int frequency = 90;
 const int max_amplitude = 32767;
 const int duration = 2; //in s
 
@@ -69,8 +69,9 @@ int main(){
             double channel1 = amplitude * value;
             double channel2 = (max_amplitude-amplitude) * value;
             // Write data values in each channel
-            write_as_byte(wav , channel1, 4);
-            write_as_byte(wav , channel2, 4);
+            write_as_byte(wav , channel1, 2);
+            write_as_byte(wav , channel2, 2);
+        }
 
             int end_audio = wav.tellp();
             //Store the size of the audio data in sub_chunk2_size
@@ -79,10 +80,10 @@ int main(){
 
             // Store the chunkSize
             wav.seekp(4,ios::beg);
-            write_as_byte(wav,end_audio-start_audio+sub_chunk1_size+16+4,4);
-            // write_as_byte(wav,end_audio-8,4);
+            //write_as_byte(wav,end_audio-start_audio+sub_chunk1_size+16+4,4);
+            write_as_byte(wav,end_audio-8,4);
 
-        }
+        
     }
 
 
