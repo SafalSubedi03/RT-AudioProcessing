@@ -2,6 +2,8 @@
 #include<iostream>
 #include<portaudio.h>
 #include<cstring>
+#include<cmath>
+#include<algorithm>
 
 
 #define SAMPLE_RATE 44100
@@ -21,7 +23,14 @@ static int patestCallback(
     const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer,const PaStreamCallbackTimeInfo* timeInfo,
     PaStreamCallbackFlags statusFlags, void* userData
 ){
+    
+    float* in = (float*)inputBuffer;
+    (void)outputBuffer;
+
+    cout<<in[0]<<endl;
     return 0;
+
+
 }
 
 int main(){
