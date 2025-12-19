@@ -1,92 +1,100 @@
-#include <iostream>
-#include <fstream>
-#include <vector>
-#include <portaudio.h>
+// This file will contain the code to do real time audio processing
+#include<iostream>
+#include<portaudio.h>
+#include<cstring>
+
+
+#define SAMPLE_RATE 44100
+#define FRAMES_PER_BUFFER 512
+
 
 using namespace std;
-
-// WAV file header structure
-struct WAVHeader {
-    char riff[4] = {'R','I','F','F'};
-    uint32_t chunkSize;
-    char wave[4] = {'W','A','V','E'};
-    char fmt[4] = {'f','m','t',' '};
-    uint32_t subChunk1Size = 16;
-    uint16_t audioFormat = 1; // PCM
-    uint16_t numChannels = 1;
-    uint32_t sampleRate = 44100;
-    uint32_t byteRate;
-    uint16_t blockAlign;
-    uint16_t bitsPerSample = 16;
-    char data[4] = {'d','a','t','a'};
-    uint32_t dataSize;
-};
-
-int main() {
-    PaError err = Pa_Initialize();
-    if (err != paNoError) {
-        cerr << "PortAudio initialization failed: " << Pa_GetErrorText(err) << endl;
-        return 1;
+static void checkError(PaError err){
+    if(err != paNoError){
+        cout<<"Got Error:- "<<Pa_GetErrorText(err)<<endl;
+        exit(EXIT_FAILURE);
     }
+}
+
+
+static int patestCallback(
+    const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer,const PaStreamCallbackTimeInfo* timeInfo,
+    PaStreamCallbackFlags statusFlags, void* userData
+){
+    return 0;
+}
+
+int main(){
+    PaError err;
+    err = Pa_Initialize();
+    checkError(err);
+
+    int numDevices = Pa_GetDeviceCount();
+    cout<<"Found "<<numDevices<<" devices."<<endl;
+    if(numDevices < 0){
+        cout<<"Error Getting Device Count"<<endl;
+        exit(EXIT_FAILURE);
+    }
+    const PaDeviceInfo* deviceInfo;
+    // for(int i = 0;i < numDevices;i++){
+    //     deviceInfo = Pa_GetDeviceInfo(i);
+    //     cout<<"Device "<<i+1<<endl;
+    //     cout<<"     name:- "<<deviceInfo->name<<endl;
+    //     cout<<"     maxInputChannel:- "<<deviceInfo->maxInputChannels<<endl;
+    //     cout<<"     maxOutputChannels:- "<<deviceInfo->maxOutputChannels<<endl;
+    //     cout<<"     defaultSampleRate:- "<<deviceInfo->defaultSampleRate<<endl;
+    // }
+    int indevice = 0;
+    int outdevice = 2;
+    int duration = 5; //in s
+
+    PaStreamParameters inputParameters;
+    PaStreamParameters outputParameters;
+
+    deviceInfo = Pa_GetDeviceInfo(indevice);
+    memset(&inputParameters, 0,sizeof(inputParameters));
+    inputParameters.channelCount = 2;
+    inputParameters.device = indevice;
+    inputParameters.hostApiSpecificStreamInfo = NULL;
+    inputParameters.sampleFormat = paFloat32;
+    inputParameters.suggestedLatency = deviceInfo->defaultLowInputLatency;
+
+    deviceInfo = Pa_GetDeviceInfo(outdevice);
+    memset(&outputParameters, 0,sizeof(outputParameters));
+    outputParameters.channelCount = 2;
+    outputParameters.device = outdevice;
+    outputParameters.hostApiSpecificStreamInfo = NULL;
+    outputParameters.sampleFormat = paFloat32;
+    outputParameters.suggestedLatency = deviceInfo->defaultHighOutputLatency;
 
     PaStream* stream;
-    PaStreamParameters inputParams;
-    inputParams.device = Pa_GetDefaultInputDevice();
-    if (inputParams.device == paNoDevice) {
-        cerr << "No default input device." << endl;
-        return 1;
-    }
-
-    inputParams.channelCount = 1;          // mono
-    inputParams.sampleFormat = paInt16;    // 16-bit PCM
-    inputParams.suggestedLatency = Pa_GetDeviceInfo(inputParams.device)->defaultLowInputLatency;
-    inputParams.hostApiSpecificStreamInfo = nullptr;
-
-    int sampleRate = 44100;
-    int seconds = 5;                        // record duration
-    int totalFrames = sampleRate * seconds;
-    vector<int16_t> recordedSamples(totalFrames);
-
-    err = Pa_OpenStream(&stream, &inputParams, nullptr, sampleRate, paFramesPerBufferUnspecified, paClipOff, nullptr, nullptr);
-    if (err != paNoError) {
-        cerr << "Failed to open stream: " << Pa_GetErrorText(err) << endl;
-        return 1;
-    }
+    err = Pa_OpenStream(
+        &stream,
+        &inputParameters,
+        &outputParameters,
+        SAMPLE_RATE,
+        FRAMES_PER_BUFFER,
+        paNoFlag,
+        patestCallback,
+        NULL
+    );
+    checkError(err);
 
     err = Pa_StartStream(stream);
-    if (err != paNoError) {
-        cerr << "Failed to start stream: " << Pa_GetErrorText(err) << endl;
-        return 1;
-    }
+    checkError(err);
 
-    cout << "Recording for " << seconds << " seconds..." << endl;
-    err = Pa_ReadStream(stream, recordedSamples.data(), totalFrames);
-    if (err != paNoError) {
-        cerr << "Failed to read stream: " << Pa_GetErrorText(err) << endl;
-        return 1;
-    }
+    cout<<"---RECORDING AUDIO FOR "<<duration<<" SECONDS---"<<endl;
+    Pa_Sleep(duration * 1000);
 
-    Pa_StopStream(stream);
-    Pa_CloseStream(stream);
-    Pa_Terminate();
-    cout << "Recording finished!" << endl;
+    err = Pa_StopStream(stream);
+    checkError(err);
+    err = Pa_CloseStream(stream);
+    checkError(err);
 
-    // Prepare WAV header
-    WAVHeader header;
-    header.numChannels = 1;
-    header.sampleRate = sampleRate;
-    header.bitsPerSample = 16;
-    header.byteRate = header.sampleRate * header.numChannels * header.bitsPerSample / 8;
-    header.blockAlign = header.numChannels * header.bitsPerSample / 8;
-    header.dataSize = recordedSamples.size() * sizeof(int16_t);
-    header.chunkSize = 36 + header.dataSize;
 
-    // Save to file
-    ofstream outFile("recorded.wav", ios::binary);
-    outFile.write(reinterpret_cast<char*>(&header), sizeof(header));
-    outFile.write(reinterpret_cast<char*>(recordedSamples.data()), recordedSamples.size() * sizeof(int16_t));
-    outFile.close();
+    err = Pa_Terminate();
+    checkError(err);
+    return EXIT_SUCCESS;
 
-    cout << "Saved as recorded.wav" << endl;
-    return 0;
+
 }
