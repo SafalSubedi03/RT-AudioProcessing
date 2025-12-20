@@ -8,8 +8,9 @@
 #include "../include/WriteWavFile.h"
 
 #define SAMPLE_RATE 44100
-#define FRAMES_PER_BUFFER 512
-
+#define FRAMES_PER_BUFFER 1024
+#define ALPHA 25 // sound amplification factor to store in the output file
+#define OALPHA 2 // sound amplification factor for output playback
 using namespace std;
 
 // Stop flag for Ctrl+C
@@ -17,7 +18,7 @@ static volatile bool keepRunning = true;
 void intHandler(int) { keepRunning = false; }
 
 // ANC parameters
-const unsigned short int M = 128;
+const unsigned short int M = 30;
 float wk[M] = {0};      // global adaptive filter
 float mu = 0.2f;        // learning rate
 
@@ -30,6 +31,8 @@ ReadData rd(in);
 ofstream outfile("out.wav", ios::binary);
 WriteWavFile wd(outfile);
 
+// Global buffer for storing all error samples
+int16_t* globalEBuffer = nullptr;
 
 template<typename T>
 T clampp(T value, T minVal, T maxVal) {
@@ -60,39 +63,47 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
         return paComplete;
     }
 
-    float eBuffer[FRAMES_PER_BUFFER] = {0};
+    // Allocate dynamic array for this block
+    int16_t* eBlock = new int16_t[framesToRead](); // zero-initialized
 
     for (unsigned long i = M; i < framesToRead; i++) {
         // Play reference signal
-        out[i] = uData[i];
+        out[i] = OALPHA*uData[i];
 
         // Compute y[n] = wk * u[n-k]
         float y = 0.0f;
         for (unsigned short k = 0; k < M; k++)
-            y += wk[k] * uData[i - k];
+            y += wk[k] * (uData[i - k] / 32768.0f);
 
         // Get microphone sample d[n]
-        float d = (inMic != nullptr) ? static_cast<float>(inMic[i]) : 0.0f;
+        float d = (inMic != nullptr) ? (inMic[i] / 32768.0f) : 0.0f;
 
         // Compute error signal e[n]
-        eBuffer[i] = d - y;
+        float e = d - y;
+
+        // Store in dynamic array (scale & clamp)
+        eBlock[i] = (int16_t)(clampp(e, -1.0f, 1.0f) * ALPHA * 32767.0f);
 
         // Update filter coefficients
         float input_power = 1e-6f;
+        for (unsigned short k = 0; k < M; k++){
+            float temp = uData[i - k] / 32768.0f;
+            input_power += temp * temp;
+        }
         for (unsigned short k = 0; k < M; k++)
-            input_power += uData[i - k] * uData[i - k];
-
-        for (unsigned short k = 0; k < M; k++)
-            wk[k] += (mu / input_power) * eBuffer[i] * uData[i - k];
+            wk[k] += (mu / input_power) * e * (uData[i - k]/32768.0f);
     }
 
-    // Convert error signal to int16_t for WAV
-    int16_t eInt[FRAMES_PER_BUFFER] = {0};
-    for (unsigned long i = 0; i < framesToRead; i++)
-        eInt[i] = static_cast<int16_t>(clampp(eBuffer[i], -32768.0f, 32767.0f));
+    // Allocate global buffer if first callback
+    if (globalEBuffer == nullptr) {
+        globalEBuffer = new int16_t[rd.getTotalSamples()]();
+    }
 
-    // Write error signal to WAV
-    wd.writeData(eInt, framesToRead, fileIndex);
+    // Append this block to global buffer
+    for (unsigned long i = 0; i < framesToRead; i++)
+        globalEBuffer[fileIndex + i] = eBlock[i];
+
+    delete[] eBlock;
 
     fileIndex += framesToRead;
     return (fileIndex >= totalSamples) ? paComplete : paContinue;
@@ -160,8 +171,13 @@ int main() {
     checkError(err);
     Pa_Terminate();
 
-    // Update WAV header with recorded samples
-    wd.updateHeader(fileIndex * sizeof(int16_t));
+    // Write the full error signal to WAV once
+    if (globalEBuffer != nullptr) {
+        wd.writeData(globalEBuffer, fileIndex, 0);
+        wd.updateHeader(fileIndex * sizeof(int16_t));
+        delete[] globalEBuffer;
+    }
+
     outfile.close();
     in.close();
 
