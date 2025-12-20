@@ -56,7 +56,7 @@ class readFile {
 
 
         //Assuming the data is PCM 16 bit format
-    std::vector<int16_t> readData(unsigned short number_of_samples,
+    std::vector<float> readData(unsigned short number_of_samples,
                                 unsigned short starting_sample) {
         const int bytes_per_sample = bits_per_sample / 8;
         const int frame_size = block_align;
@@ -66,7 +66,7 @@ class readFile {
             return {};
         }
 
-        std::vector<int16_t> samples(number_of_samples);
+        std::vector<float> samples(number_of_samples);
 
         wav.seekg(44 + starting_sample * frame_size, ios::beg);
 
@@ -83,7 +83,7 @@ class readFile {
 };
 
 int main() {
-    ifstream wav("monotest.wav", ios::binary);
+    ifstream wav("test.wav", ios::binary);
     if (!wav) {
         cerr << "Cannot open WAV file!\n";
         return 1;
@@ -100,7 +100,7 @@ int main() {
     unsigned int number_of_samples = 44100*2;
     unsigned short int starting_sample = 0;
     
-    std::vector<int16_t> data = rf.readData(number_of_samples,starting_sample);
+    std::vector<float> data = rf.readData(number_of_samples,starting_sample);
     cout<<"[";
     for(int i = 0;i<data.size();i++){
         cout<<data[i]<<",";
