@@ -8,8 +8,8 @@
 #include "../include/WriteWavFile.h"
 
 #define SAMPLE_RATE 44100
-#define FRAMES_PER_BUFFER 1024
-#define ALPHA 50 // sound amplification factor to store in the output file
+#define FRAMES_PER_BUFFER 512
+#define ALPHA 30 // sound amplification factor to store in the output file
 #define OALPHA 1 // sound amplification factor for output playback
 using namespace std;
 
@@ -20,7 +20,7 @@ void intHandler(int) { keepRunning = false; }
 // ANC parameters
 const unsigned short int M = 138;
 float wk[M] = {0};      // global adaptive filter
-float mu = 0.4f;        // learning rate
+float mu = 0.5f;        // learning rate
 
 // File tracking
 static unsigned long fileIndex = 0;
@@ -32,7 +32,13 @@ ofstream outfile("out.wav", ios::binary);
 WriteWavFile wd(outfile);
 
 // Global buffer for storing all error samples
-int16_t* globalEBuffer = nullptr;
+int16_t* globalEBuffer = rd.getTotalSamples() > 0 ? new int16_t[rd.getTotalSamples()] : nullptr;
+int16_t* globaluBuffer = rd.getTotalSamples()  > 0 ? new int16_t[rd.getTotalSamples()] : nullptr;
+float* gloabalnormalizedubuffer = new float[rd.getTotalSamples()];
+unsigned long totalSamples = rd.getTotalSamples();
+bool firstCall = true;
+
+// make totalSamples exactly divisible by frames per buffer 
 
 template<typename T>
 T clampp(T value, T minVal, T maxVal) {
@@ -50,57 +56,55 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
 {
     int16_t* out = (int16_t*)outputBuffer;
     const int16_t* inMic = (const int16_t*)inputBuffer;
+    float* uData = nullptr;
 
-    unsigned long totalSamples = rd.getTotalSamples();
-    unsigned long framesToRead = framesPerBuffer;
-    if (fileIndex + framesPerBuffer > totalSamples)
-        framesToRead = totalSamples - fileIndex;
+    
+    
+    if(!firstCall){
+        uData =  &gloabalnormalizedubuffer[fileIndex-M];
+    } else {
+        uData =  &gloabalnormalizedubuffer[fileIndex];
+        firstCall = false;
+    }
 
-    int16_t* uData = rd.read(fileIndex, framesToRead);
-    if (!uData) { // EOF
-        for (unsigned long i = 0; i < framesPerBuffer; i++)
-            out[i] = 0;
+    if (fileIndex + framesPerBuffer > totalSamples) { // EOF
         return paComplete;
     }
 
-    // Allocate global buffer if first callback
-    if (globalEBuffer == nullptr) {
-        globalEBuffer = new int16_t[rd.getTotalSamples()]();
-    }
+    
 
-    // Allocate dynamic array for this block
-    // int16_t* eBlock = new int16_t[framesToRead](); // zero-initialized
-
-    for (unsigned long i = M; i < framesToRead; i++) {
+    for (unsigned long i = M; i < framesPerBuffer; i++) {
         // Play reference signal
-        out[i] = OALPHA*uData[i];
+        out[i] = OALPHA * uData[i-M] * 32767.0f;
 
         // Compute y[n] = wk * u[n-k]
         float y = 0.0f;
-        for (unsigned short k = 0; k < M; k++)
-            y += wk[k] * (uData[i - k] / 32768.0f);
+        for (unsigned short k = 0; k < M; k++) {
+            unsigned long idx = (i >= k) ? (i - k) : 0;
+            y += wk[k] * uData[idx];
+        }
 
         // Get microphone sample d[n]
         float d = (inMic != nullptr) ? (inMic[i] / 32768.0f) : 0.0f;
 
         // Compute error signal e[n]
         float e = d - y;
-
-        // Store in dynamic array 
         globalEBuffer[fileIndex + i] = (int16_t)(e * ALPHA * 32767.0f);
 
         // Update filter coefficients
         float input_power = 1e-6f;
-        for (unsigned short k = 0; k < M; k++){
-            float temp = uData[i - k] / 32768.0f;
-            input_power += temp * temp;
+        for (unsigned short k = 0; k < M; k++) {
+            input_power += uData[i-k] * uData[i-k];
         }
-        for (unsigned short k = 0; k < M; k++)
-            wk[k] += (mu / input_power) * e * (uData[i - k]/32768.0f);
+        for (unsigned short k = 0; k < M; k++) {
+            
+            wk[k] += (mu / input_power) * e * uData[i-k];
+        }
     }
+  
 
-    fileIndex += framesToRead;
-    return (fileIndex >= totalSamples) ? paComplete : paContinue;
+    fileIndex += framesPerBuffer;
+    return paContinue;
 }
 
 // Error checker
@@ -151,6 +155,14 @@ int main() {
                         audioCallback, NULL);
     checkError(err);
 
+    // Setup before calling callback 
+    totalSamples -= totalSamples % FRAMES_PER_BUFFER;
+    globaluBuffer = rd.read(0, totalSamples);
+
+    for(uint64_t i = 0; i < totalSamples; i++) {
+        gloabalnormalizedubuffer[i] = globaluBuffer[i] / 32768.0f;
+    }
+
     err = Pa_StartStream(stream);
     checkError(err);
 
@@ -170,7 +182,9 @@ int main() {
         wd.writeData(globalEBuffer, fileIndex, 0);
         wd.updateHeader(fileIndex * sizeof(int16_t));
         delete[] globalEBuffer;
-    }
+        delete[] globaluBuffer;
+        delete[] gloabalnormalizedubuffer;
+    } 
 
     outfile.close();
     in.close();
