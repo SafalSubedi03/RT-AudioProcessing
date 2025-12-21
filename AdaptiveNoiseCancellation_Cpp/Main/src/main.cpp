@@ -10,7 +10,7 @@
 #define SAMPLE_RATE 44100
 #define FRAMES_PER_BUFFER 1024
 #define ALPHA 50 // sound amplification factor to store in the output file
-#define OALPHA 2 // sound amplification factor for output playback
+#define OALPHA 1 // sound amplification factor for output playback
 using namespace std;
 
 // Stop flag for Ctrl+C
@@ -18,7 +18,7 @@ static volatile bool keepRunning = true;
 void intHandler(int) { keepRunning = false; }
 
 // ANC parameters
-const unsigned short int M = 150;
+const unsigned short int M = 138;
 float wk[M] = {0};      // global adaptive filter
 float mu = 0.4f;        // learning rate
 
@@ -63,8 +63,13 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
         return paComplete;
     }
 
+    // Allocate global buffer if first callback
+    if (globalEBuffer == nullptr) {
+        globalEBuffer = new int16_t[rd.getTotalSamples()]();
+    }
+
     // Allocate dynamic array for this block
-    int16_t* eBlock = new int16_t[framesToRead](); // zero-initialized
+    // int16_t* eBlock = new int16_t[framesToRead](); // zero-initialized
 
     for (unsigned long i = M; i < framesToRead; i++) {
         // Play reference signal
@@ -82,7 +87,7 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
         float e = d - y;
 
         // Store in dynamic array 
-        eBlock[i] = (int16_t)(e * ALPHA * 32767.0f);
+        globalEBuffer[fileIndex + i] = (int16_t)(e * ALPHA * 32767.0f);
 
         // Update filter coefficients
         float input_power = 1e-6f;
@@ -93,17 +98,6 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
         for (unsigned short k = 0; k < M; k++)
             wk[k] += (mu / input_power) * e * (uData[i - k]/32768.0f);
     }
-
-    // Allocate global buffer if first callback
-    if (globalEBuffer == nullptr) {
-        globalEBuffer = new int16_t[rd.getTotalSamples()]();
-    }
-
-    // Append this block to global buffer
-    for (unsigned long i = 0; i < framesToRead; i++)
-        globalEBuffer[fileIndex + i] = eBlock[i];
-
-    delete[] eBlock;
 
     fileIndex += framesToRead;
     return (fileIndex >= totalSamples) ? paComplete : paContinue;
