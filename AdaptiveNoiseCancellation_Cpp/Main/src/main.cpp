@@ -9,7 +9,7 @@
 
 #define SAMPLE_RATE 44100
 #define FRAMES_PER_BUFFER 1024
-#define ALPHA 25 // sound amplification factor to store in the output file
+#define ALPHA 50 // sound amplification factor to store in the output file
 #define OALPHA 2 // sound amplification factor for output playback
 using namespace std;
 
@@ -18,9 +18,9 @@ static volatile bool keepRunning = true;
 void intHandler(int) { keepRunning = false; }
 
 // ANC parameters
-const unsigned short int M = 30;
+const unsigned short int M = 150;
 float wk[M] = {0};      // global adaptive filter
-float mu = 0.2f;        // learning rate
+float mu = 0.4f;        // learning rate
 
 // File tracking
 static unsigned long fileIndex = 0;
@@ -81,8 +81,8 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
         // Compute error signal e[n]
         float e = d - y;
 
-        // Store in dynamic array (scale & clamp)
-        eBlock[i] = (int16_t)(clampp(e, -1.0f, 1.0f) * ALPHA * 32767.0f);
+        // Store in dynamic array 
+        eBlock[i] = (int16_t)(e * ALPHA * 32767.0f);
 
         // Update filter coefficients
         float input_power = 1e-6f;
